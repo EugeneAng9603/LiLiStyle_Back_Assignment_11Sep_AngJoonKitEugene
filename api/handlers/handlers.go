@@ -9,8 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// func getLikeProduct(realdb *sql.DB) func(*gin.Context) {
-
 // LikeProduct allows a user to like a specific product.
 func LikeProduct(c *gin.Context) {
 	// Parse user ID from the JWT token

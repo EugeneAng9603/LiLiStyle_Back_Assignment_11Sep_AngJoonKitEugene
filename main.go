@@ -15,10 +15,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
+	defer dbConn.Close()
 
 	// Test the database connection
-	err = db.Ping()
+	err = dbConn.Ping()
 	if err != nil {
 		log.Fatalf("Error pinging database: %v", err)
 	}
