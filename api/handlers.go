@@ -6,6 +6,7 @@ import (
 	"product-like/db"       // Import your database package
 	"product-like/pkg/auth" // Import the auth package
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -151,5 +152,187 @@ func CancelProductLike(dbConn *sql.DB) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "Product like canceled successfully", "user_id": userID})
+	}
+}
+
+type Product struct {
+	ID                uint64    `db:"id"`
+	ShopID            uint64    `db:"shop_id"`
+	Name              string    `db:"name"`
+	Description       string    `db:"description"`
+	ThumbnailURL      string    `db:"thumbnail_url"`
+	OriginPrice       int64     `db:"origin_price"`
+	DiscountedPrice   int64     `db:"discounted_price"`
+	DiscountedRate    float64   `db:"discounted_rate"`
+	Status            string    `db:"status"`
+	InStock           bool      `db:"in_stock"`
+	IsPreorder        bool      `db:"is_preorder"`
+	IsPurchasable     bool      `db:"is_purchasable"`
+	DeliveryCondition string    `db:"delivery_condition"`
+	DeliveryDisplay   string    `db:"delivery_display"`
+	CreatedAt         time.Time `db:"created_at"`
+	UpdatedAt         time.Time `db:"updated_at"`
+}
+
+// GetProducts retrieves a list of products.
+func GetProducts(dbConn *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Your code to retrieve products from the database.
+		// You can use dbConn to execute SQL queries to fetch products.
+
+		// Example query:
+		rows, err := dbConn.QueryContext(c.Request.Context(), "SELECT * FROM products")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch products"})
+			return
+		}
+		defer rows.Close()
+
+		// Iterate through the rows and build a slice of products.
+		var products []Product
+		for rows.Next() {
+			var product Product
+			err := rows.Scan(&product.ID, &product.Name, &product.Description, &product.OriginPrice)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch products"})
+				return
+			}
+			products = append(products, product)
+		}
+
+		// Return the list of products as a JSON response.
+		c.JSON(http.StatusOK, gin.H{"products": products})
+	}
+}
+
+// CreateProduct creates a new product.
+func CreateProduct(dbConn *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Define a struct to represent the request body data.
+		var request struct {
+			Name        string  `json:"name" binding:"required"`
+			Description string  `json:"description" binding:"required"`
+			Price       float64 `json:"price" binding:"required"`
+		}
+
+		// Bind the request body to the request struct.
+		if err := c.ShouldBindJSON(&request); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Insert the new product into the database.
+		query := `
+			INSERT INTO products (name, description, price)
+			VALUES ($1, $2, $3)
+			RETURNING id
+		`
+
+		var productID int64
+		err := dbConn.QueryRowContext(
+			c.Request.Context(),
+			query,
+			request.Name,
+			request.Description,
+			request.Price,
+		).Scan(&productID)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create the product"})
+			return
+		}
+
+		// Return a success response with the created product ID.
+		c.JSON(http.StatusCreated, gin.H{"message": "Product created successfully", "product_id": productID})
+	}
+}
+
+// UpdateProduct updates an existing product.
+func UpdateProduct(dbConn *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Parse the product ID from the URL parameters
+		productID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+			return
+		}
+
+		// Define a struct to represent the request body data for updates.
+		var request struct {
+			Name        string  `json:"name"`
+			Description string  `json:"description"`
+			Price       float64 `json:"price"`
+		}
+
+		// Bind the request body to the request struct.
+		if err := c.ShouldBindJSON(&request); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Update the product in the database.
+		query := `
+			UPDATE products
+			SET name = COALESCE($1, name), description = COALESCE($2, description), price = COALESCE($3, price)
+			WHERE id = $4
+		`
+
+		result, err := dbConn.ExecContext(
+			c.Request.Context(),
+			query,
+			request.Name,
+			request.Description,
+			request.Price,
+			productID,
+		)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update the product"})
+			return
+		}
+
+		// Check if the product was updated successfully.
+		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected == 0 {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+			return
+		}
+
+		// Return a success response.
+		c.JSON(http.StatusOK, gin.H{"message": "Product updated successfully"})
+	}
+}
+
+// DeleteProduct deletes a product by its ID.
+func DeleteProduct(dbConn *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Parse the product ID from the URL parameters
+		productID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+			return
+		}
+
+		// Delete the product from the database
+		query := `
+			DELETE FROM products
+			WHERE id = $1
+		`
+
+		result, err := dbConn.ExecContext(c.Request.Context(), query, productID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete the product"})
+			return
+		}
+
+		// Check if the product was deleted successfully
+		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected == 0 {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+			return
+		}
+
+		// Return a success response
+		c.JSON(http.StatusOK, gin.H{"message": "Product deleted successfully"})
 	}
 }

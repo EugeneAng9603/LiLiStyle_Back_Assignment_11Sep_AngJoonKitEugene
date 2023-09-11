@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"product-like/api"
 	"product-like/pkg/auth"
 
 	"github.com/gin-gonic/gin"
@@ -40,12 +41,14 @@ func main() {
 	// Initialize API routes
 	apiRoutes := router.Group("/api")
 
-	// Setup routes
-	// setupRoutes(apiRoutes, authMiddleware)
-	apiRoutes.GET("/products", api.GetProducts)
-	apiRoutes.POST("/products", authMiddleware.Authorize(), api.CreateProduct)
-	apiRoutes.PUT("/products/:id", authMiddleware.Authorize(), api.UpdateProduct)
-	apiRoutes.DELETE("/products/:id", authMiddleware.Authorize(), api.DeleteProduct)
+	apiRoutes.POST("/like-product", authMiddleware.Authorize(), api.LikeProduct(dbConn))
+	apiRoutes.GET("/liked-products", authMiddleware.Authorize(), api.RetrieveLikedProducts(dbConn))
+	apiRoutes.POST("/cancel-like", authMiddleware.Authorize(), api.CancelProductLike(dbConn))
+
+	apiRoutes.GET("/products", api.GetProducts(dbConn))
+	apiRoutes.POST("/products", authMiddleware.Authorize(), api.CreateProduct(dbConn))
+	apiRoutes.PUT("/products/:id", authMiddleware.Authorize(), api.UpdateProduct(dbConn))
+	apiRoutes.DELETE("/products/:id", authMiddleware.Authorize(), api.DeleteProduct(dbConn))
 
 	// Start the server on localhost:8080
 	err = router.Run(":8080")
