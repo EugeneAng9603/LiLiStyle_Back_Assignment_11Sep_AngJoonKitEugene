@@ -1,12 +1,9 @@
-// models/user.go
-
 package models
 
 import (
 	"time"
 )
 
-// Product represents the product table in the database.
 type Product struct {
 	ID                uint64    `json:"id"`
 	ShopID            int64     `json:"shop_id"`
@@ -25,24 +22,3 @@ type Product struct {
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }
-
-// // NewProduct creates a new Product instance.
-// func NewProduct(shopID int64, name, description, thumbnailURL string, originPrice, discountedPrice int64, discountedRate float64, status string, inStock, isPreorder, isPurchasable bool, deliveryCondition, deliveryDisplay string) *Product {
-//     return &Product{
-//         ShopID:           shopID,
-//         Name:             name,
-//         Description:      description,
-//         ThumbnailURL:     thumbnailURL,
-//         OriginPrice:      originPrice,
-//         DiscountedPrice:  discountedPrice,
-//         DiscountedRate:   discountedRate,
-//         Status:           status,
-//         InStock:          inStock,
-//         IsPreorder:       isPreorder,
-//         IsPurchasable:    isPurchasable,
-//         DeliveryCondition: deliveryCondition,
-//         DeliveryDisplay:  deliveryDisplay,
-//         CreatedAt:        time.Now(),
-//         UpdatedAt:        time.Now(),
-//     }
-// }

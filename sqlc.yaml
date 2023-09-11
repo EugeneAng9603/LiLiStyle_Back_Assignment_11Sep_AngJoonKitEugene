@@ -10,15 +10,3 @@ packages:
     password: "postgrespass"
     host: "localhost"
     port: 5432
-# version: "1"
-# packages:
-#   - name: "db"
-#     path: "./db"
-#     queries: "./db/query.sql"
-#     schema: "public"
-#     engine: "postgres"
-#     dbname: "product_like_db"
-#     user: "postgres"
-#     password: "postgrespass"
-#     host: "localhost"
-#     port: 5432

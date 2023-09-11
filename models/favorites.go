@@ -4,7 +4,6 @@ import (
 	"time"
 )
 
-// Favorite represents the favorites table in the database.
 type Favorite struct {
 	ID        uint64    `json:"id"`
 	UserID    int64     `json:"user_id"`

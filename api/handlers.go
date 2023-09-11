@@ -2,21 +2,20 @@ package api
 
 import (
 	"database/sql"
+	"log"
 	"net/http"
-	"product-like/db"       // Import your database package
-	"product-like/pkg/auth" // Import the auth package
+	"product-like/db"
+	"product-like/pkg/auth"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 )
 
-// LikeProduct allows a user to like a specific product.
-// LikeProduct allows a user to like a specific product.
+// LikeProduct allows user to like a specific product.
 func LikeProduct(dbConn *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Parse user ID from the JWT token
-		//ctx := context.Background()
 
 		user := auth.GetUserFromContext(c)
 
@@ -27,7 +26,6 @@ func LikeProduct(dbConn *sql.DB) gin.HandlerFunc {
 
 		userID := uint64(user.ID)
 
-		// Parse product ID from the request (you need to extract it from the request body)
 		var request struct {
 			ProductID uint64 `json:"product_id"`
 		}
@@ -39,7 +37,7 @@ func LikeProduct(dbConn *sql.DB) gin.HandlerFunc {
 
 		productID := request.ProductID
 
-		// Check if the user has already liked the product (you'll need to query the database)
+		// Check if the user has already liked the product
 		liked, err := db.CheckProductLike(c.Request.Context(), dbConn, userID, uint64(productID))
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
@@ -51,7 +49,7 @@ func LikeProduct(dbConn *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Add the like to the database (insert a record into the "favorites" table)
+		// Update like to the database
 		if _, err := db.AddProductLike(c.Request.Context(), dbConn, uint64(userID), uint64(productID)); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add like to the database"})
 			return
@@ -64,7 +62,7 @@ func LikeProduct(dbConn *sql.DB) gin.HandlerFunc {
 // RetrieveLikedProducts retrieves a list of products that the user liked.
 func RetrieveLikedProducts(dbConn *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Parse user ID from the JWT token
+
 		user := auth.GetUserFromContext(c)
 
 		if user == nil {
@@ -78,7 +76,7 @@ func RetrieveLikedProducts(dbConn *sql.DB) gin.HandlerFunc {
 		page := c.DefaultQuery("page", "1")
 		limit := c.DefaultQuery("limit", "10")
 
-		// Convert page and limit to integers
+		// Convert page and limit from string to integers
 		pageInt, err := strconv.Atoi(page)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid page parameter"})
@@ -177,12 +175,10 @@ type Product struct {
 // GetProducts retrieves a list of products.
 func GetProducts(dbConn *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Your code to retrieve products from the database.
-		// You can use dbConn to execute SQL queries to fetch products.
 
-		// Example query:
 		rows, err := dbConn.QueryContext(c.Request.Context(), "SELECT * FROM products")
 		if err != nil {
+			log.Println("Error fetching products:", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch products"})
 			return
 		}
@@ -192,8 +188,26 @@ func GetProducts(dbConn *sql.DB) gin.HandlerFunc {
 		var products []Product
 		for rows.Next() {
 			var product Product
-			err := rows.Scan(&product.ID, &product.Name, &product.Description, &product.OriginPrice)
+			err := rows.Scan(
+				&product.ID,
+				&product.ShopID,
+				&product.Name,
+				&product.Description,
+				&product.ThumbnailURL,
+				&product.OriginPrice,
+				&product.DiscountedPrice,
+				&product.DiscountedRate,
+				&product.Status,
+				&product.InStock,
+				&product.IsPreorder,
+				&product.IsPurchasable,
+				&product.DeliveryCondition,
+				&product.DeliveryDisplay,
+				&product.CreatedAt,
+				&product.UpdatedAt,
+			)
 			if err != nil {
+				log.Println("Error fetching products:", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch products"})
 				return
 			}
@@ -212,7 +226,7 @@ func CreateProduct(dbConn *sql.DB) gin.HandlerFunc {
 		var request struct {
 			Name        string  `json:"name" binding:"required"`
 			Description string  `json:"description" binding:"required"`
-			Price       float64 `json:"price" binding:"required"`
+			Price       float64 `json:"origin_price" binding:"required"`
 		}
 
 		// Bind the request body to the request struct.
@@ -335,4 +349,27 @@ func DeleteProduct(dbConn *sql.DB) gin.HandlerFunc {
 		// Return a success response
 		c.JSON(http.StatusOK, gin.H{"message": "Product deleted successfully"})
 	}
+}
+
+// CreateUser creates a new user and returns the user's ID.
+func CreateUser(dbConn *sql.DB, username, password string) (int64, error) {
+	// Hash the user's password before storing it in the database
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return 0, err
+	}
+
+	// Insert the user into the database
+	query := `
+        INSERT INTO users (username, password)
+        VALUES ($1, $2)
+        RETURNING id
+    `
+	var userID int64
+	err = dbConn.QueryRow(query, username, hashedPassword).Scan(&userID)
+	if err != nil {
+		return 0, err
+	}
+
+	return userID, nil
 }

@@ -4,28 +4,34 @@ import (
 	"fmt"
 	"net/http"
 	"product-like/models"
+	"strconv"
+	"strings"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 )
 
-// AuthMiddleware is a middleware for authentication and authorization
+// middleware for authentication and authorization
 type AuthMiddleware struct {
 	jwtSecret string
 }
 
-// NewMiddleware creates a new instance of AuthMiddleware
+// creates a new instance of AuthMiddleware
 func NewMiddleware(jwtSecret string) (*AuthMiddleware, error) {
 	return &AuthMiddleware{
 		jwtSecret: jwtSecret,
 	}, nil
 }
 
-// Authorize is a middleware function for authorization
+// function for authorization
 func (m *AuthMiddleware) Authorize() gin.HandlerFunc {
 	return func(c *gin.Context) {
+
 		// Get the JWT token from the request headers
 		tokenString := c.GetHeader("Authorization")
+		// Remove the "Bearer " prefix if it exists
+		tokenString = strings.TrimPrefix(tokenString, "Bearer ")
+		fmt.Print("tokenString: ", tokenString)
 		if tokenString == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing JWT token"})
 			c.Abort()
@@ -42,13 +48,16 @@ func (m *AuthMiddleware) Authorize() gin.HandlerFunc {
 		})
 
 		if err != nil {
+			fmt.Printf("\n JWT Parse Error: %s\n", err)
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid JWT token"})
 			c.Abort()
 			return
 		}
 
+		fmt.Print("\n token: ", token)
 		// Check if the token is valid and not expired
 		if !token.Valid {
+			fmt.Printf("\n JWT Token Invalid!")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid JWT token"})
 			c.Abort()
 			return
@@ -56,46 +65,40 @@ func (m *AuthMiddleware) Authorize() gin.HandlerFunc {
 
 		// Extract claims from the token
 		claims, ok := token.Claims.(jwt.MapClaims)
+		fmt.Println("\n Claims: ", claims)
 		if !ok {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid JWT claims"})
 			c.Abort()
 			return
 		}
 
-		// Extract user ID from claims (you can customize the claims structure)
-		userID, ok := claims["sub"].(float64)
+		// Extract user ID from claims as a string
+		userID, ok := claims["sub"].(string)
 		if !ok {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID in JWT claims"})
 			c.Abort()
 			return
 		}
 
+		// Parse the user ID as needed (e.g., convert it to an integer)
+		parsedUserID, err := strconv.Atoi(userID)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID format in JWT claims"})
+			c.Abort()
+			return
+		}
+
+		// Convert the parsed user ID to uint64
+		userUint64 := uint64(parsedUserID)
+
 		// Set the user context with the extracted user ID
-		c.Set("user_id", uint64(userID))
+		c.Set("user_id", userUint64)
 
 		// Continue with the request
 		c.Next()
 	}
 }
 
-// GetUserFromContext retrieves the user ID from the request context.
-//
-//	func GetUserFromContext(ctx context.Context) *User {
-//		// Check if the context has a user ID value set
-//		if userID, ok := ctx.Value("user_id").(uint64); ok {
-//			// Replace this part with your logic to retrieve user information from the database.
-//			// This is just a placeholder example.
-//			user := &User{
-//				ID:    userID,
-//				Name:  name
-//				Email: email,
-//				// Add other user properties as needed
-//			}
-//			return user
-//		}
-//		return nil
-//	}
-//
 // GetUserFromContext is a helper function to retrieve the authenticated user from the context.
 func GetUserFromContext(c *gin.Context) *models.User {
 	user, _ := c.Get("user")
