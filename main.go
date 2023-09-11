@@ -4,7 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"product-like/api/handlers"
+
+	"product-like/pkg/auth"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
@@ -31,13 +32,20 @@ func main() {
 	// // Set up authentication middleware
 	// router.Use(auth.Middleware())
 
-	// API routes
-	apiRoutes := router.Group("/api")
-	{
-		apiRoutes.POST("/like-product", handlers.LikeProduct(dbConn))
-		apiRoutes.GET("/liked-products", handlers.RetrieveLikedProducts(dbConn))
-		apiRoutes.DELETE("/cancel-like", handlers.CancelProductLike(dbConn))
+	authMiddleware, err := auth.NewMiddleware("my-secret-key")
+	if err != nil {
+		log.Fatalf("Failed to initialize auth middleware: %v", err)
 	}
+
+	// Initialize API routes
+	apiRoutes := router.Group("/api")
+
+	// Setup routes
+	// setupRoutes(apiRoutes, authMiddleware)
+	apiRoutes.GET("/products", api.GetProducts)
+	apiRoutes.POST("/products", authMiddleware.Authorize(), api.CreateProduct)
+	apiRoutes.PUT("/products/:id", authMiddleware.Authorize(), api.UpdateProduct)
+	apiRoutes.DELETE("/products/:id", authMiddleware.Authorize(), api.DeleteProduct)
 
 	// Start the server on localhost:8080
 	err = router.Run(":8080")
@@ -46,3 +54,15 @@ func main() {
 	}
 
 }
+
+/*
+func setupRoutes(apiRoutes *gin.RouterGroup, authMiddleware *auth.Middleware) {
+	// Set up your routes here using apiRoutes
+	apiRoutes.GET("/products", api.GetProducts)
+	apiRoutes.POST("/products", authMiddleware.Authorize(), api.CreateProduct)
+	apiRoutes.PUT("/products/:id", authMiddleware.Authorize(), api.UpdateProduct)
+	apiRoutes.DELETE("/products/:id", authMiddleware.Authorize(), api.DeleteProduct)
+
+	// Add more routes as needed
+}
+*/
